@@ -56,6 +56,10 @@ export async function signup(req, res){
         await sendVerificationEmail(user.email, verificationToken);
     } catch (error) {
         console.error("Error in signup", error);
+        res.status(500).json({
+            success:false,
+            message: "Error during signup"
+        });
     }
 }
 
@@ -90,18 +94,60 @@ export async function verifyEmail(req, res){
             }
         });
     } catch (error) {
-        console.error("Error in signup route: ", error);
+        console.error("Error in verifyEmail route: ", error);
         res.status(500).json({
             success:false,
-            message: "Error during signup"
+            message: "Error during verifyEmail"
         });
     }
 }
 
 export async function login(req, res){
-    res.send("Login route");
+    try {
+        const{email, password} = req.body;
+        const user = await User.findOne({email});
+
+        if(!user){
+            return res.status(400).json({
+                success:false,
+                message: "Invalid Username"
+            });
+        }
+
+        const isPasswordValid = await bcryptjs.compare(password, user.password);
+
+        if(!isPasswordValid){
+            return res.status(400).json({
+                success:false,
+                message:"Invalid Credentials",
+            });
+        }
+
+        generateTokenAndSetCookie(res, user._id);
+        user.lastLogin = Date.now();
+        user.save();
+
+        res.status(200).json({
+            success: true,
+            message:"User login successful",
+            user:{
+            ... user._doc,
+            password: undefined,
+            }
+        });
+    } catch (error) {
+        console.error("Error in login route: ", error);
+        res.status(500).json({
+            success:false,
+            message: "Error during login"
+        });
+    }
 }
 
 export async function logout(req, res){
-    res.send("Logout route");
+    res.clearCookie("token");
+    res.status(200).json({
+        success: true, 
+        message: "User logged out successfully"
+    });
 }
