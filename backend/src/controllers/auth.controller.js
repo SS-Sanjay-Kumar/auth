@@ -1,11 +1,14 @@
-import mongoose from "mongoose";
 import bcryptjs from 'bcryptjs';
+import crypto from 'crypto';
+import dotenv from 'dotenv/config.js'
 
 import {User} from '../models/User.js';
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 import {
     sendVerificationEmail,
     sendWelcomeEmail,
+    sendPasswordResetEmail,
+    sendPasswordResetSuccessEmail,
 } from '../mailtrap/emails.js';
 
 export async function signup(req, res){
@@ -150,4 +153,81 @@ export async function logout(req, res){
         success: true, 
         message: "User logged out successfully"
     });
+}
+
+export async function forgotPassword(req, res) {
+    try {
+        const {email} = req.body;
+
+        const user = await User.findOne({email});
+        if(!user){
+            return res.status(400).json({
+                success: false,
+                message: "User not found !"
+            })
+        }
+        const resetToken = crypto.randomBytes(20).toString("hex");
+        const resetTokenExpiresAt = Date.now() + 60 * 60 * 1000; // valid for 1 hr
+
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpiresAt = resetTokenExpiresAt;
+        await user.save(); 
+
+        await sendPasswordResetEmail(user.email, `${process.env.CLIENT_URL}/reset-password/${resetToken}`);
+        res.status(200).json(
+            {
+                success: true,
+                message: "Password reset mail has been sent to your inbox!"
+            }
+        )
+    } catch (error) {
+        console.error("Error in forgotPassword ", error);
+        res.status(500).json({
+            success:false,
+            message: "Error in forgotPassword"
+        })
+    }
+}
+
+export async function resetPassword(req, res){
+    
+    try {
+        const {resetToken} = req.params ;
+        const {password} = req.body;
+        const user = await User.findOne({
+            resetPasswordToken: resetToken,
+            resetPasswordExpiresAt:{$gt: Date.now()},
+        })
+        
+        if(!user){
+            return res.status(400).json({
+                success:false,
+                message: "Invalid/Expired Reset URL"
+            });
+        }
+
+        const hashedPassword = await bcryptjs.hash(password, 10); //salt -> 10
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpiresAt = undefined;
+        
+        await user.save();
+        await sendPasswordResetSuccessEmail(user.email);
+
+        res.status(200).json({
+            success: true,
+            message: "Your account password has been reset!",
+            user:{
+                ...user._doc,
+                password : undefined,
+            },
+        })
+
+    } catch (error) {
+        console.error("Error in resetPassword, ", error);
+        res.status(500).json({
+            success: false,
+            message: "Error in resetPassword",
+        })
+    }
 }

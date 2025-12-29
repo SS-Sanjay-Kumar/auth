@@ -41,3 +41,37 @@ export const sendWelcomeEmail= async(email, name) => {
         throw new Error("Error sending welcome email ", error);
     }
 }
+
+export const sendPasswordResetEmail = async(email, resetURL)=>{
+    const recipient = [{email}]
+    try {
+        const response = await mailtrapClient.send({
+            from: sender,
+            to: recipient,
+            subject: "Reset your account password",
+            html: PASSWORD_RESET_REQUEST_TEMPLATE.replace("{resetURL}",resetURL),
+            category:"reset password"
+        })
+        console.log("Reset Password Request Email sent successfully", response);
+
+    } catch (error) {
+        throw new error("Error in sendPasswordResetEmail ", error);
+    }
+}
+
+export const sendPasswordResetSuccessEmail = async(email)=>{
+    const recipient = [{email}];
+    try {
+        const response = await mailtrapClient.send({
+            from: sender,
+            to: recipient,
+            subject:"Your account password has been reset",
+            html:PASSWORD_RESET_SUCCESS_TEMPLATE,
+            category: "reset password",
+        });
+
+        console.log("sendPasswordResetSuccessEmail done succesfully ", response);
+    } catch (error) {
+        throw new Error("Error in sendPasswordResetSuccessEmail, ", error);
+    }
+}
