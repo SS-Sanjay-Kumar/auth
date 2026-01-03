@@ -128,7 +128,7 @@ export async function login(req, res) {
 
         generateTokenAndSetCookie(res, user._id);
         user.lastLogin = Date.now();
-        user.save();
+        await user.save();
 
         res.status(200).json({
             success: true,
